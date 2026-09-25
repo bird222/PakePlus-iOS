@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>棱镜 · 光线与消息在此交错</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔮</text></svg>" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    /* ========== 基础样式 ========== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      font-family: system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px;
+      color: #fff;
+      background: linear-gradient(135deg, #0f0c29, #1a1a3e, #24243e);
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      position: relative;
+    }
+    .app {
+      width: 100%;
+      max-width: 600px;
+      height: 90vh;
+      max-height: 750px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.15);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+    }
+    .header {
+      padding: 12px 16px;
+      background: rgba(0,0,0,0.25);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .header h2 {
+      font-weight: 500;
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .header h2 span {
+      opacity: 0.7;
+      font-weight: 300;
+      font-size: 0.9rem;
+    }
+    .header-btns {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .glass-btn {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      padding: 5px 12px;
+      border-radius: 16px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background 0.2s;
+      outline: none;
+    }
+    .glass-btn:active { background: rgba(255,255,255,0.2); }
+    .glass-btn:hover { background: rgba(255,255,255,0.18); }
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+    }
+    .messages::-webkit-scrollbar { width: 4px; }
+    .messages::-webkit-scrollbar-track { background: transparent; }
+    .messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+    .loading-spinner {
+      display: flex;
+      justify-content: center;
+      padding: 10px;
+    }
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid rgba(255,255,255,0.2);
+      border-top-color: #6c63ff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .message-card {
+      background: rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+      word-break: break-word;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .msg-meta {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      margin-bottom: 6px;
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.6);
+      align-items: center;
+    }
+    .msg-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .msg-username {
+      font-weight: 600;
+      background: rgba(100,140,255,0.15);
+      padding: 2px 8px;
+      border-radius: 10px;
+      color: rgba(180,200,255,0.9);
+    }
+    .msg-username.is-self {
+      background: rgba(255,215,0,0.25);
+      color: #ffd700;
+    }
+    .msg-time {
+      letter-spacing: 0.3px;
+    }
+    .msg-content {
+      color: rgba(255,255,255,0.9);
+      line-height: 1.5;
+      font-size: 0.95rem;
+      width: 100%;
+    }
+    .msg-media {
+      margin-top: 6px;
+      border-radius: 8px;
+      overflow: hidden;
+      max-width: 70%;
+      align-self: flex-start;
+    }
+    .msg-media img,
+    .msg-media video {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 6px;
+    }
+    .msg-media audio { width: 100%; margin-top: 4px; }
+    .input-area {
+      padding: 10px 14px;
+      background: rgba(0,0,0,0.3);
+      border-top: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .media-preview {
+      display: none;
+      position: relative;
+      background: rgba(0,0,0,0.3);
+      border-radius: 10px;
+      padding: 6px;
+    }
+    .media-preview img,
+    .media-preview video {
+      width: 100%;
+      max-height: 120px;
+      object-fit: contain;
+      border-radius: 6px;
+    }
+    .media-preview .remove-media {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: rgba(0,0,0,0.7);
+      border: none;
+      color: white;
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .input-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .glass-input {
+      flex: 1;
+      padding: 8px 14px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 18px;
+      color: white;
+      font-size: 0.9rem;
+      outline: none;
+    }
+    .glass-input::placeholder { color: rgba(255,255,255,0.4); }
+    .glass-input:focus { border-color: rgba(255,255,255,0.4); }
+    .send-btn {
+      background: linear-gradient(135deg, #6c63ff, #4a90e2);
+      border: none;
+      color: white;
+      padding: 8px 18px;
+      border-radius: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+    }
+    .send-btn:active { transform: scale(0.97); }
+    .send-btn:disabled { opacity: 0.5; pointer-events: none; }
+    .attach-btn {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      padding: 6px;
+      border-radius: 50%;
+      cursor: pointer;
+      width: 34px;
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      outline: none;
+    }
+    .attach-btn:active { background: rgba(255,255,255,0.2); }
+    .upload-progress {
+      width: 100%;
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 4px;
+      display: none;
+    }
+    .upload-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: #6c63ff;
+      border-radius: 2px;
+      transition: width 0.1s linear;
+    }
+    .upload-progress.active { display: block; }
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.6);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal-box {
+      background: #2a2a4a;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.15);
+      padding: 20px;
+      width: 340px;
+      max-width: 95vw;
+      color: white;
+      position: relative;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal-box h3 {
+      font-weight: 500;
+      margin-bottom: 16px;
+      font-size: 1.1rem;
+      text-align: center;
+    }
+    .modal-close {
+      position: absolute;
+      top: 10px;
+      right: 14px;
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.6);
+      font-size: 1.3rem;
+      cursor: pointer;
+    }
+    .modal-close:hover { color: white; }
+    .auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .auth-form input {
+      padding: 10px 14px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      color: white;
+      outline: none;
+    }
+    .auth-form input:focus { border-color: rgba(255,255,255,0.4); }
+    .auth-submit {
+      padding: 10px;
+      border-radius: 12px;
+      border: none;
+      background: linear-gradient(135deg, #6c63ff, #4a90e2);
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    .inline-link {
+      color: #6c63ff;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .hidden { display: none; }
+    .toast-container {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .toast {
+      background: rgba(0,0,0,0.8);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      animation: toastIn 0.3s ease;
+    }
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    /* 兼容旧浏览器的简单动画 */
+    @-webkit-keyframes spin { to { -webkit-transform: rotate(360deg); } }
+    .spinner { -webkit-animation: spin 0.8s linear infinite; }
+    @-webkit-keyframes toastIn {
+      from { opacity: 0; -webkit-transform: translateY(10px); }
+      to { opacity: 1; -webkit-transform: translateY(0); }
+    }
+    .toast { -webkit-animation: toastIn 0.3s ease; }
+
+    /* 响应式 */
+    @media (max-width:480px) {
+      .app { border-radius: 14px; }
+      .header h2 span { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Toast容器 -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- 主应用 -->
+  <div class="app">
+    <div class="header">
+      <div class="header-title">
+        <h2 onclick="window.location.href='https://prism-main.pages.dev/'">🔮 棱镜 <span>| 光线与消息在此交错</span></h2>
+      </div>
+      <div class="header-btns" id="headerBtns"></div>
+    </div>
+    <div class="messages" id="messagesContainer">
+      <div class="loading-spinner" id="loadingSpinner" style="display:none;"><div class="spinner"></div></div>
+      <div style="text-align:center; padding:30px; color:rgba(255,255,255,0.4); display:none;" id="emptyHint">暂无消息，折射你的第一句话 ✨</div>
+      <div id="pendingSpinner" class="loading-spinner" style="display:none;"><div class="spinner"></div></div>
+    </div>
+    <div class="input-area">
+      <div class="media-preview" id="mediaPreview">
+        <button class="remove-media" id="removeMediaBtn">✕</button>
+        <img id="previewImage" src="" style="display:none;" />
+        <video id="previewVideo" controls style="display:none;"></video>
+        <audio id="previewAudio" controls style="display:none;"></audio>
+        <div class="upload-progress" id="uploadProgress">
+          <div class="upload-progress-bar" id="uploadProgressBar"></div>
+        </div>
+      </div>
+      <div class="input-row">
+        <button class="attach-btn" id="attachBtn" title="添加媒体">📎</button>
+        <input type="text" class="glass-input" id="messageInput" placeholder="说点什么，让光线折射..." autocomplete="off" />
+        <button class="send-btn" id="sendBtn" disabled>发送</button>
+      </div>
+    </div>
+    <input type="file" id="fileInput" class="hidden-file-input" accept="image/*,video/*,audio/*" style="display:none;" />
+  </div>
+
+  <script>
+    // ============================================================
+    // 必要的 Polyfill
+    // ============================================================
+    // Promise 简单 polyfill
+    if (typeof Promise === 'undefined') {
+      console.warn('当前环境不支持Promise，请引入polyfill库以保证功能正常');
+    }
+
+    // ============================================================
+    // 应用初始化
+    // ============================================================
+    (function() {
+      // 配置
+      var SUPABASE_URL = 'https://jcziygyakdrbeundbyej.supabase.co';
+      var SUPABASE_ANON_KEY = 'sb_publishable_64sOvMP95bbBXrlowFYqRg_g-exMtA8';
+      var EMAIL_DOMAIN = '@user.chat';
+      var PAGE_SIZE = 10;
+
+      // 创建Supabase客户端
+      var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      // 状态变量
+      var currentUser = null;
+      var currentProfile = null;
+      var messages = [];
+      var hasMore = true;
+      var isLoadingMore = false;
+      var isInitialLoad = true;
+
+      var selectedFile = null;
+      var selectedMediaType = null;
+
+      // DOM元素
+      var messagesContainer = document.getElementById('messagesContainer');
+      var messageInput = document.getElementById('messageInput');
+      var sendBtn = document.getElementById('sendBtn');
+      var headerBtns = document.getElementById('headerBtns');
+      var loadingSpinner = document.getElementById('loadingSpinner');
+      var emptyHint = document.getElementById('emptyHint');
+      var pendingSpinner = document.getElementById('pendingSpinner');
+      var attachBtn = document.getElementById('attachBtn');
+      var fileInput = document.getElementById('fileInput');
+      var mediaPreview = document.getElementById('mediaPreview');
+      var previewImage = document.getElementById('previewImage');
+      var previewVideo = document.getElementById('previewVideo');
+      var previewAudio = document.getElementById('previewAudio');
+      var removeMediaBtn = document.getElementById('removeMediaBtn');
+      var uploadProgress = document.getElementById('uploadProgress');
+      var uploadProgressBar = document.getElementById('uploadProgressBar');
+      var toastContainer = document.getElementById('toastContainer');
+
+      // 工具函数
+      function showToast(message, type, duration) {
+        type = type || 'info';
+        duration = duration || 2500;
+        var toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = message;
+        toastContainer.appendChild(toast);
+        setTimeout(function() {
+          toast.parentNode.removeChild(toast);
+        }, duration);
+      }
+
+      function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      function setLoading(el, text) {
+        if (!el) return;
+        el.disabled = true;
+        el.dataset.originalText = el.textContent;
+        el.textContent = text;
+      }
+
+      function resetLoading(el) {
+        if (!el) return;
+        el.disabled = false;
+        el.textContent = el.dataset.originalText || el.textContent;
+      }
+
+      function updateSendButton() {
+        sendBtn.disabled = !messageInput.value.trim() && !selectedFile;
+      }
+
+      function getDisplayName() {
+        if (currentProfile && currentProfile.username) return currentProfile.username;
+        if (currentUser && currentUser.email) return currentUser.email.split('@')[0] || '用户';
+        return '用户';
+      }
+
+      function formatDateTime(isoString) {
+        var date = new Date(isoString);
+        var now = new Date();
+        var isToday = date.getFullYear() === now.getFullYear() &&
+          date.getMonth() === now.getMonth() &&
+          date.getDate() === now.getDate();
+        if (isToday) {
+          return date.toLocaleTimeString('zh-CN', { hour12: false });
+        } else {
+          return date.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        }
+      }
+
+      // 模态框
+      function closeModal() {
+        var overlay = document.getElementById('modalOverlay');
+        if (overlay) overlay.parentNode.removeChild(overlay);
+      }
+
+      function showModal(html) {
+        closeModal();
+        var overlay = document.createElement('div');
+        overlay.id = 'modalOverlay';
+        overlay.className = 'modal-overlay';
+        overlay.innerHTML = html;
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', function(e) {
+          if (e.target === overlay) closeModal();
+        });
+        return overlay;
+      }
+
+      // 认证相关
+      window.showAuthModal = function(mode) {
+        var title = mode === 'login' ? '登录' : '注册';
+        var html = '' +
+          '<div class="modal-box">' +
+          '  <button class="modal-close" onclick="closeModal()">✕</button>' +
+          '  <h3>' + title + '</h3>' +
+          '  <div class="auth-form">' +
+          '    <input type="text" id="authUsername" placeholder="用户名" autocomplete="off" />' +
+          '    <input type="password" id="authPassword" placeholder="密码" />' +
+          '    <button class="auth-submit" id="authSubmitBtn">' + title + '</button>' +
+          '  </div>' +
+          '  <p style="text-align:center; margin-top:10px; font-size:0.8rem; opacity:0.7;">' +
+          (mode === 'login' ?
+            '还没有账号？<span class="inline-link" onclick="closeModal();showAuthModal(\'register\')">立即注册</span>' :
+            '已有账号？<span class="inline-link" onclick="closeModal();showAuthModal(\'login\')">去登录</span>') +
+          '  </p>' +
+          '</div>';
+        showModal(html);
+        document.getElementById('authSubmitBtn').addEventListener('click', function() {
+          handleAuthSubmit(mode);
+        });
+      };
+
+      window.closeModal = closeModal;
+
+      window.handleAuthSubmit = function(mode) {
+        var username = document.getElementById('authUsername').value.trim();
+        var password = document.getElementById('authPassword').value;
+        if (!username) {
+          alert('请输入用户名');
+          return;
+        }
+        if (mode === 'register' && password.length < 6) {
+          alert('密码长度至少6位');
+          return;
+        }
+        if (!password) {
+          alert('请输入密码');
+          return;
+        }
+        var btn = document.getElementById('authSubmitBtn');
+        setLoading(btn, mode === 'login' ? '登录中...' : '注册中...');
+        var email = encodeURIComponent(username) + EMAIL_DOMAIN;
+
+        if (mode === 'register') {
+          supabase.auth.signUp({ email: email, password: password, options: { data: { username: username } } })
+            .then(function(res) {
+              if (res.error) {
+                alert('注册失败：' + res.error.message);
+                resetLoading(btn);
+                return;
+              }
+              // 自动登录
+              return supabase.auth.signInWithPassword({ email: email, password: password });
+            })
+            .then(function(res) {
+              if (res && res.error) {
+                alert('注册成功但自动登录失败，请手动登录');
+                closeModal();
+                resetLoading(btn);
+                return;
+              }
+              closeModal();
+              resetLoading(btn);
+              location.reload();
+            })
+            .catch(function(err) {
+              alert('错误：' + err.message);
+              resetLoading(btn);
+            });
+        } else {
+          supabase.auth.signInWithPassword({ email: email, password: password })
+            .then(function(res) {
+              if (res.error) {
+                alert('登录失败：' + res.error.message);
+                resetLoading(btn);
+                return;
+              }
+              closeModal();
+              resetLoading(btn);
+              location.reload();
+            })
+            .catch(function(err) {
+              alert('错误：' + err.message);
+              resetLoading(btn);
+            });
+        }
+      };
+
+      window.logout = function() {
+        supabase.auth.signOut().then(function() {
+          location.reload();
+        });
+      };
+
+      // 账户信息（简化：只显示用户名和退出）
+      window.showAccountInfo = function() {
+        var html = '' +
+          '<div class="modal-box">' +
+          '  <button class="modal-close" onclick="closeModal()">✕</button>' +
+          '  <h3>账户信息</h3>' +
+          '  <div style="text-align:center; margin:10px 0;">用户名：' + escapeHtml(getDisplayName()) + '</div>' +
+          '  <button class="glass-btn" style="width:100%; margin-top:10px;" onclick="logout()">退出登录</button>' +
+          '</div>';
+        showModal(html);
+      };
+
+      // 媒体选择和上传
+      function clearMediaSelection() {
+        selectedFile = null;
+        selectedMediaType = null;
+        fileInput.value = '';
+        previewImage.style.display = 'none';
+        previewVideo.style.display = 'none';
+        previewAudio.style.display = 'none';
+        previewImage.src = '';
+        previewVideo.src = '';
+        previewAudio.src = '';
+        mediaPreview.style.display = 'none';
+        uploadProgress.classList.remove('active');
+        uploadProgressBar.style.width = '0%';
+        updateSendButton();
+      }
+
+      function showMediaPreview(file, type) {
+        clearMediaSelection();
+        var url = URL.createObjectURL(file);
+        if (type === 'image') {
+          previewImage.src = url;
+          previewImage.style.display = 'block';
+        } else if (type === 'video') {
+          previewVideo.src = url;
+          previewVideo.style.display = 'block';
+        } else if (type === 'audio') {
+          previewAudio.src = url;
+          previewAudio.style.display = 'block';
+        }
+        mediaPreview.style.display = 'block';
+        selectedFile = file;
+        selectedMediaType = type;
+        updateSendButton();
+      }
+
+      attachBtn.addEventListener('click', function() {
+        if (!currentUser) {
+          alert('请先登录才能发送媒体');
+          return;
+        }
+        fileInput.click();
+      });
+
+      fileInput.addEventListener('change', function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 50 * 1024 * 1024) {
+          alert('文件不能超过50MB');
+          fileInput.value = '';
+          return;
+        }
+        var type = file.type.indexOf('image/') === 0 ? 'image' : file.type.indexOf('video/') === 0 ? 'video' : 'audio';
+        showMediaPreview(file, type);
+      });
+
+      removeMediaBtn.addEventListener('click', clearMediaSelection);
+
+      // 上传文件到Supabase Storage
+      function uploadFile(file, onProgress) {
+        return new Promise(function(resolve, reject) {
+          var fileExt = file.name.split('.').pop();
+          var fileName = Date.now() + '-' + Math.random().toString(36).substring(2, 8) + '.' + fileExt;
+          var filePath = 'public/' + fileName;
+          var url = SUPABASE_URL + '/storage/v1/object/media/' + filePath;
+          // 获取access token
+          supabase.auth.getSession().then(function(sessionRes) {
+            var session = sessionRes.data.session;
+            if (!session) {
+              reject(new Error('未登录'));
+              return;
+            }
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', url, true);
+            xhr.setRequestHeader('Authorization', 'Bearer ' + session.access_token);
+            xhr.setRequestHeader('x-upsert', 'false');
+            xhr.upload.onprogress = function(e) {
+              if (e.lengthComputable) {
+                onProgress(Math.round((e.loaded / e.total) * 100));
+              }
+            };
+            xhr.onload = function() {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(SUPABASE_URL + '/storage/v1/object/public/media/' + filePath);
+              } else {
+                reject(new Error('上传失败：HTTP ' + xhr.status));
+              }
+            };
+            xhr.onerror = function() {
+              reject(new Error('网络错误'));
+            };
+            xhr.send(file);
+          }).catch(function(err) {
+            reject(err);
+          });
+        });
+      }
+
+      // 发送消息
+      async function trySendMessage() {
+        var content = messageInput.value.trim();
+        if (!content && !selectedFile) return;
+        if (!currentUser) {
+          showSendChoiceModal(content);
+          return;
+        }
+
+        setLoading(sendBtn, '发送中...');
+        if (selectedFile) {
+          setLoading(attachBtn, '⏳');
+          uploadProgress.classList.add('active');
+          uploadProgressBar.style.width = '0%';
+        }
+
+        var mediaUrl = null;
+        if (selectedFile) {
+          try {
+            mediaUrl = await uploadFile(selectedFile, function(percent) {
+              uploadProgressBar.style.width = percent + '%';
+            });
+          } catch (err) {
+            alert('媒体上传失败：' + err.message);
+            resetLoading(sendBtn);
+            resetLoading(attachBtn);
+            uploadProgress.classList.remove('active');
+            return;
+          }
+        }
+
+        supabase.from('messages').insert([{
+          content: content || '',
+          media_url: mediaUrl,
+          user_id: currentUser.id
+        }]).select().then(function(res) {
+          if (res.error) {
+            alert('发送失败：' + res.error.message);
+            if (mediaUrl) {
+              // 尝试删除上传的文件（忽略错误）
+              var path = mediaUrl.split('/').pop();
+              supabase.storage.from('media').remove(['public/' + path]);
+            }
+            resetLoading(sendBtn);
+            resetLoading(attachBtn);
+            uploadProgress.classList.remove('active');
+            return;
+          }
+
+          var newMsg = res.data[0];
+          newMsg.username = getDisplayName();
+          newMsg.reportCount = 0;
+          messages.unshift(newMsg);
+
+          messageInput.value = '';
+          clearMediaSelection();
+          resetLoading(sendBtn);
+          resetLoading(attachBtn);
+          updateSendButton();
+          renderMessages(false, false);
+        }).catch(function(err) {
+          alert('发送出错：' + err.message);
+          resetLoading(sendBtn);
+          resetLoading(attachBtn);
+          uploadProgress.classList.remove('active');
+        });
+      }
+
+      // 未登录时的发送选择
+      function showSendChoiceModal(content) {
+        var safeContent = escapeHtml(content).replace(/'/g, "\\'");
+        var html = '' +
+          '<div class="modal-box">' +
+          '  <button class="modal-close" onclick="closeModal()">✕</button>' +
+          '  <h3>你尚未登录</h3>' +
+          '  <p style="text-align:center; margin-bottom:12px; opacity:0.8;">折射需要一束光，登录或继续匿名？</p>' +
+          '  <button class="glass-btn" style="width:100%; margin-bottom:8px;" onclick="closeModal();showAuthModal(\'login\')">登录</button>' +
+          '  <button class="glass-btn" style="width:100%; margin-bottom:8px;" onclick="closeModal();showAuthModal(\'register\')">注册</button>' +
+          '  <button class="glass-btn" style="width:100%;" onclick="sendAnonymous(\'' + safeContent + '\')">继续匿名发送</button>' +
+          '</div>';
+        showModal(html);
+      }
+
+      window.sendAnonymous = function(content) {
+        supabase.from('messages').insert([{ content: content }]).then(function(res) {
+          if (res.error) {
+            alert('发送失败：' + res.error.message);
+          } else {
+            messageInput.value = '';
+            updateSendButton();
+            loadMessages(false);
+          }
+          closeModal();
+        });
+      };
+
+      // 消息渲染
+      function getUsernameMap(userIds) {
+        if (!userIds.length) return Promise.resolve({});
+        return supabase.from('profiles').select('id, username').in('id', userIds).then(function(res) {
+          var map = {};
+          if (res.data) {
+            res.data.forEach(function(p) {
+              map[p.id] = p.username;
+            });
+          }
+          return map;
+        });
+      }
+
+      async function renderMessages(preserveScroll, preventScroll) {
+        var userIds = messages.map(function(m) { return m.user_id; }).filter(Boolean);
+        var usernameMap = await getUsernameMap(userIds);
+        messages.forEach(function(msg) {
+          if (msg.user_id && usernameMap[msg.user_id]) msg.username = usernameMap[msg.user_id];
+        });
+
+        // 清空消息容器（保留加载指示器）
+        var children = messagesContainer.children;
+        for (var i = children.length - 1; i >= 0; i--) {
+          if (children[i].id !== 'pendingSpinner' && children[i].id !== 'loadingSpinner' && children[i].id !== 'emptyHint') {
+            messagesContainer.removeChild(children[i]);
+          }
+        }
+
+        if (messages.length === 0) {
+          emptyHint.style.display = 'block';
+        } else {
+          emptyHint.style.display = 'none';
+        }
+
+        messages.forEach(function(msg) {
+          var card = document.createElement('div');
+          card.className = 'message-card';
+          var username = msg.username || '匿名';
+          var isSelf = currentUser && msg.user_id === currentUser.id;
+          var usernameClass = isSelf ? 'msg-username is-self' : 'msg-username';
+          var timeStr = formatDateTime(msg.created_at);
+
+          var mediaHtml = '';
+          if (msg.media_url) {
+            var url = msg.media_url;
+            if (url.match(/\.(mp4|webm|ogg|mov)$/i)) {
+              mediaHtml = '<div class="msg-media"><video src="' + escapeHtml(url) + '" controls preload="auto" style="width:100%; height:auto;"></video></div>';
+            } else if (url.match(/\.(mp3|wav|ogg|m4a)$/i)) {
+              mediaHtml = '<div class="msg-media"><audio src="' + escapeHtml(url) + '" controls style="width:100%;"></audio></div>';
+            } else {
+              mediaHtml = '<div class="msg-media"><img src="' + escapeHtml(url) + '" alt="图片" loading="lazy" style="width:100%; height:auto;" /></div>';
+            }
+          }
+
+          var cardHTML = '' +
+            '<div class="msg-meta">' +
+            '  <div class="msg-left">' +
+            '    <span class="' + usernameClass + '">' + escapeHtml(username) + '</span>' +
+            '    <span class="msg-time">' + timeStr + '</span>' +
+            '  </div>' +
+            '</div>' +
+            '<div class="msg-content">' + escapeHtml(msg.content || '') + '</div>' +
+            mediaHtml;
+          card.innerHTML = cardHTML;
+          messagesContainer.insertBefore(card, pendingSpinner);
+        });
+
+        if (preventScroll) return;
+        if (preserveScroll) {
+          // 保持滚动位置不变
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        } else {
+          messagesContainer.scrollTop = 0;
+        }
+      }
+
+      // 加载消息
+      async function loadMessages(loadMore) {
+        if (!loadMore) {
+          if (isLoadingMore) return;
+          loadingSpinner.style.display = 'flex';
+          emptyHint.style.display = 'none';
+          messages = [];
+          hasMore = true;
+          isInitialLoad = true;
+        } else {
+          if (isLoadingMore || !hasMore) return;
+          if (messages.length === 0) {
+            hasMore = false;
+            return;
+          }
+          isLoadingMore = true;
+          pendingSpinner.style.display = 'flex';
+        }
+
+        try {
+          var query = supabase.from('messages').select('id, content, media_url, created_at, user_id');
+
+          if (loadMore && messages.length > 0) {
+            var oldestMsg = messages[messages.length - 1];
+            query = query.lt('created_at', oldestMsg.created_at);
+          }
+
+          var res = await query.order('created_at', { ascending: false }).limit(PAGE_SIZE);
+
+          loadingSpinner.style.display = 'none';
+          pendingSpinner.style.display = 'none';
+          isLoadingMore = false;
+
+          if (res.error) {
+            alert('加载消息失败：' + res.error.message);
+            if (!loadMore) emptyHint.style.display = 'block';
+            return;
+          }
+
+          var fetched = res.data || [];
+          hasMore = fetched.length === PAGE_SIZE;
+
+          if (!loadMore) {
+            messages = fetched;
+            isInitialLoad = false;
+            await renderMessages(false, false);
+          } else {
+            // 去重合并
+            var existingIds = {};
+            messages.forEach(function(m) { existingIds[m.id] = true; });
+            var uniqueNew = fetched.filter(function(m) { return !existingIds[m.id]; });
+            if (uniqueNew.length === 0) {
+              hasMore = fetched.length === PAGE_SIZE;
+              return;
+            }
+            messages = messages.concat(uniqueNew);
+            await renderMessages(true, false);
+          }
+
+          if (messages.length === 0) emptyHint.style.display = 'block';
+        } catch (err) {
+          loadingSpinner.style.display = 'none';
+          pendingSpinner.style.display = 'none';
+          isLoadingMore = false;
+          alert('加载消息出错：' + err.message);
+          if (!loadMore) emptyHint.style.display = 'block';
+        }
+      }
+
+      // 滚动加载
+      var scrollTimeout = null;
+      messagesContainer.addEventListener('scroll', function() {
+        if (scrollTimeout) return;
+        scrollTimeout = setTimeout(function() {
+          scrollTimeout = null;
+          var st = messagesContainer.scrollTop;
+          var sh = messagesContainer.scrollHeight;
+          var ch = messagesContainer.clientHeight;
+          if (st + ch >= sh - 10 && !isLoadingMore && hasMore && !isInitialLoad) {
+            loadMessages(true);
+          }
+        }, 150);
+      });
+
+      // 实时订阅
+      function subscribeRealtime() {
+        var channel = supabase.channel('public:messages');
+        channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, function(payload) {
+          var newMsg = payload.new;
+          if (messages.some(function(m) { return m.id === newMsg.id; })) return;
+          messages.unshift(newMsg);
+          renderMessages(false, false);
+        });
+        channel.on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, function(payload) {
+          messages = messages.filter(function(m) { return m.id !== payload.old.id; });
+          renderMessages(true, false);
+        });
+        // UPDATE 事件可选，这里忽略
+        channel.subscribe();
+      }
+
+      // 头部渲染
+      function renderHeader() {
+        if (currentUser) {
+          var displayName = getDisplayName();
+          headerBtns.innerHTML = '' +
+            '<span style="opacity:0.8; margin-right:8px;">' + escapeHtml(displayName) + '</span>' +
+            '<button class="glass-btn" onclick="showAccountInfo()">信息</button>';
+          attachBtn.style.display = 'flex';
+        } else {
+          headerBtns.innerHTML = '' +
+            '<button class="glass-btn" onclick="showAuthModal(\'login\')">登录</button>' +
+            '<button class="glass-btn" onclick="showAuthModal(\'register\')">注册</button>';
+          attachBtn.style.display = 'none';
+        }
+      }
+
+      // 加载当前用户资料
+      function loadProfile(userId) {
+        return supabase.from('profiles').select('id, username, is_admin, created_at').eq('id', userId).single().then(function(res) {
+          return res.data || null;
+        });
+      }
+
+      // 初始化
+      async function initApp() {
+        var sessionRes = await supabase.auth.getSession();
+        if (sessionRes.data.session) {
+          currentUser = sessionRes.data.session.user;
+          currentProfile = await loadProfile(currentUser.id);
+        }
+        renderHeader();
+        await loadMessages(false);
+        subscribeRealtime();
+        updateSendButton();
+
+        messageInput.addEventListener('input', updateSendButton);
+        sendBtn.addEventListener('click', trySendMessage);
+        messageInput.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter' && !sendBtn.disabled) trySendMessage();
+        });
+      }
+
+      // 启动
+      initApp().catch(function(err) {
+        console.error('初始化错误', err);
+        alert('初始化失败：' + err.message);
+      });
+    })();
+  </script>
+</body>
+</html>
